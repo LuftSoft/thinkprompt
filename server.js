@@ -6,7 +6,8 @@ const pdf = require("pdf-parse");
 const officegen = require("officegen");
 const unzipper = require("unzipper");
 const { Document, Packer, Paragraph } = require("docx");
-const { PDFDocument, StandardFonts } = require("pdf-lib");
+const { PDFDocument, StandardFonts, PDFFont } = require("pdf-lib");
+const fontkit = require("fontkit");
 const path = require("path");
 
 const app = express();
@@ -47,6 +48,10 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   const filePath = req.file.path;
   const ext = path.extname(req.file.originalname).toLowerCase();
   const baseName = path.basename(req.file.originalname, ext);
+  const outputDir = "outputs";
+  const uploadDir = "uploads";
+  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
+  if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
   const outputFile = `outputs/${baseName}_UPPER${ext}`;
 
   try {
@@ -68,8 +73,11 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       const upperText = result.text.toUpperCase();
 
       const pdfDoc = await PDFDocument.create();
+      pdfDoc.registerFontkit(fontkit);
       const page = pdfDoc.addPage([600, 800]);
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fontBytes = fs.readFileSync(path.join(__dirname, "NotoSans.ttf"));
+      const font = await pdfDoc.embedFont(fontBytes);
+
       page.drawText(upperText, { x: 50, y: 750, size: 12, font });
 
       const pdfBytes = await pdfDoc.save();
@@ -104,13 +112,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
 // UI
 app.get("/", (req, res) => {
-  res.send(`
-    <h2>Upload DOCX, PDF, or PPTX</h2>
-    <form action="/upload" method="post" enctype="multipart/form-data">
-      <input type="file" name="file" accept=".docx,.pdf,.pptx" required />
-      <button type="submit">Convert</button>
-    </form>
-  `);
+  res.sendFile(path.join(__dirname, "views", "index.html"));
 });
 
 app.listen(3000, () => console.log("Server running on http://localhost:3000"));
